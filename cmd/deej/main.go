@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"github.com/milkyonehq/deej/pkg/configuration"
+	"github.com/milkyonehq/deej/pkg/discord/bot"
 	"github.com/milkyonehq/deej/pkg/logger"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -25,6 +26,16 @@ func main() {
 	logger.Init(config.LogLevel)
 
 	log.Infoln("Bot is starting...")
+
+	b, err := bot.New(config.DiscordBotToken)
+	if err != nil {
+		log.WithError(err).Fatalln("Failed to create bot.")
+	}
+
+	if err = b.Start(); err != nil {
+		log.WithError(err).Fatalln("Failed to start bot.")
+	}
+	defer b.Stop()
 
 	log.Infoln("Bot is running. Press CTRL+C to exit.")
 
