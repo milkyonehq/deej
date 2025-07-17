@@ -5,6 +5,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/milkyonehq/deej/pkg/discord/audio/player"
 	"github.com/milkyonehq/deej/pkg/discord/audio/provider"
+	"github.com/milkyonehq/deej/pkg/discord/command"
 	"github.com/milkyonehq/deej/pkg/discord/handler"
 	log "github.com/sirupsen/logrus"
 	"strings"
@@ -18,11 +19,12 @@ var (
 
 type Bot struct {
 	session          *discordgo.Session
+	commandRegistry  *command.Registry
 	playerRegistry   *player.Registry
 	providerRegistry *provider.Registry
 }
 
-func New(token string, playerRegistry *player.Registry, providerRegistry *provider.Registry) (*Bot, error) {
+func New(token string, commandRegistry *command.Registry, playerRegistry *player.Registry, providerRegistry *provider.Registry) (*Bot, error) {
 	sess, err := discordgo.New("Bot " + token)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %s", ErrCreateSession, err)
@@ -30,13 +32,14 @@ func New(token string, playerRegistry *player.Registry, providerRegistry *provid
 
 	bot := &Bot{
 		session:          sess,
+		commandRegistry:  commandRegistry,
 		playerRegistry:   playerRegistry,
 		providerRegistry: providerRegistry,
 	}
 
 	bot.session.Identify.Intents = discordgo.IntentsGuildVoiceStates
 
-	interactionCreate := handler.NewInteractionCreate()
+	interactionCreate := handler.NewInteractionCreate(bot.commandRegistry)
 	ready := handler.NewReady()
 	bot.session.AddHandler(interactionCreate.Handle)
 	bot.session.AddHandler(ready.Handle)
@@ -53,15 +56,28 @@ func (b *Bot) Start() error {
 }
 
 func (b *Bot) Stop() error {
+	cmds := b.commandRegistry.Commands()
+	var cmdNames []string
+	for id, cmd := range cmds {
+		if err := b.commandRegistry.Unregister(b.session, id); err != nil {
+			return err
+		}
+		cmdNames = append(cmdNames, cmd.Name())
+	}
+	log.WithFields(log.Fields{
+		"count":    len(cmdNames),
+		"commands": strings.Join(cmdNames, ","),
+	}).Infoln("Commands successfully unregistered.")
+
 	var playerGuildIDs []string
 	for guildID := range b.playerRegistry.Players() {
 		b.playerRegistry.Unregister(guildID)
 		playerGuildIDs = append(playerGuildIDs, guildID)
 	}
 	log.WithFields(log.Fields{
-		"count":  len(playerGuildIDs),
-		"guilds": strings.Join(playerGuildIDs, ","),
-	}).Infoln("Player successfully unregistered.")
+		"count":    len(playerGuildIDs),
+		"guildIDs": strings.Join(playerGuildIDs, ","),
+	}).Infoln("Players successfully unregistered.")
 
 	pvrs := b.providerRegistry.Providers()
 	var pvrNames []string
