@@ -3,13 +3,32 @@ package main
 import (
 	"context"
 	"github.com/milkyonehq/deej/pkg/configuration"
+	"github.com/milkyonehq/deej/pkg/discord/audio/player"
+	"github.com/milkyonehq/deej/pkg/discord/audio/provider"
 	"github.com/milkyonehq/deej/pkg/discord/bot"
 	"github.com/milkyonehq/deej/pkg/logger"
 	log "github.com/sirupsen/logrus"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 )
+
+func initProviders(providerRegistry *provider.Registry) {
+	pvrs := []provider.Provider{
+		provider.NewRaw(),
+		provider.NewYoutube(),
+	}
+	var pvrNames []string
+	for _, pvr := range pvrs {
+		providerRegistry.Register(pvr)
+		pvrNames = append(pvrNames, pvr.Name())
+	}
+	log.WithFields(log.Fields{
+		"count":     len(pvrNames),
+		"providers": strings.Join(pvrNames, ","),
+	}).Infoln("Providers successfully registered.")
+}
 
 func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
@@ -27,7 +46,12 @@ func main() {
 
 	log.Infoln("Bot is starting...")
 
-	b, err := bot.New(config.DiscordBotToken)
+	playerRegistry := player.NewRegistry()
+	providerRegistry := provider.NewRegistry()
+
+	initProviders(providerRegistry)
+
+	b, err := bot.New(config.DiscordBotToken, playerRegistry, providerRegistry)
 	if err != nil {
 		log.WithError(err).Fatalln("Failed to create bot.")
 	}
