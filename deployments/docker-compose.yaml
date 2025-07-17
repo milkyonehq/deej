@@ -1,0 +1,20 @@
+version: '3.9'
+
+services:
+  deej:
+    container_name: deej
+    restart: unless-stopped
+    stop_grace_period: 30s
+    build:
+      context: ..
+      dockerfile: 'deployments/Dockerfile'
+    image: 'deej:1.0.0'
+    environment:
+      DISCORD_BOT_TOKEN: 'FILL_ME'
+      LOG_LEVEL: 'info'
+    networks:
+      - deej
+
+networks:
+  deej:
+    name: 'deej'
