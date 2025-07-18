@@ -63,8 +63,8 @@ func (c *Clear) Execute(session *discordgo.Session, interaction *discordgo.Inter
 		return
 	}
 
-	guildPlayer.Skip()
 	guildPlayer.Queue().Clear()
+	guildPlayer.Skip()
 	if err := session.InteractionRespond(interaction.Interaction,
 		util.NewEmbedBuilder().
 			Title("🗑️ Queue cleared").
